@@ -1,0 +1,72 @@
+name: 'extport safari-build'
+description: 'Build, sign, and upload a Safari extension to App Store Connect (requires a macOS runner)'
+author: 'extport'
+
+inputs:
+  project-path:
+    description: 'Directory containing the .xcodeproj.'
+    required: true
+  team-id:
+    description: 'Apple Developer Team ID.'
+    required: true
+  issuer-id:
+    description: 'App Store Connect API issuer id.'
+    required: false
+  key-id:
+    description: 'App Store Connect API key id.'
+    required: false
+  key-base64:
+    description: 'Base64-encoded contents of the App Store Connect .p8 API key. Pass a repository secret — never commit the raw file.'
+    required: false
+  platform:
+    description: 'Build only "macos" or only "ios". Omit to build every platform the Xcode project ships.'
+    required: false
+  version:
+    description: "Fail loudly if the built app's version doesn't match this."
+    required: false
+  macos-deployment-target:
+    description: 'Minimum macOS version to build for.'
+    required: false
+    default: '12.0'
+  cli-version:
+    description: 'Pinned @extport/cli version to run via npx.'
+    required: false
+    default: '0.0.1'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Write the .p8 key to a temp file
+      if: inputs.key-base64 != ''
+      shell: bash
+      env:
+        EXTPORT_KEY_BASE64: ${{ inputs.key-base64 }}
+      run: |
+        set -euo pipefail
+        key_path="$RUNNER_TEMP/extport-asc-key.p8"
+        echo "$EXTPORT_KEY_BASE64" | base64 --decode > "$key_path"
+        chmod 600 "$key_path"
+        echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+    - name: extport safari-build
+      shell: bash
+      env:
+        EXTPORT_PROJECT_PATH: ${{ inputs.project-path }}
+        EXTPORT_TEAM_ID: ${{ inputs.team-id }}
+        ASC_ISSUER_ID: ${{ inputs.issuer-id }}
+        ASC_KEY_ID: ${{ inputs.key-id }}
+        EXTPORT_PLATFORM: ${{ inputs.platform }}
+        EXTPORT_VERSION: ${{ inputs.version }}
+        EXTPORT_MACOS_DEPLOYMENT_TARGET: ${{ inputs.macos-deployment-target }}
+        EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
+      run: |
+        set -euo pipefail
+        args=(safari-build --project-path "$EXTPORT_PROJECT_PATH" --team-id "$EXTPORT_TEAM_ID" --macos-deployment-target "$EXTPORT_MACOS_DEPLOYMENT_TARGET")
+        [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
+        [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
+        npx --yes "@extport/cli@${EXTPORT_CLI_VERSION}" "${args[@]}"
+
+    - name: Clean up the temp key file
+      if: always() && inputs.key-base64 != ''
+      shell: bash
+      run: rm -f "$RUNNER_TEMP/extport-asc-key.p8"

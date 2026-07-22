@@ -1,0 +1,54 @@
+name: 'extport push'
+description: 'Upload a browser extension artifact to extport'
+author: 'extport'
+
+inputs:
+  file:
+    description: 'Path to the zip file to upload. Omit only when store is safari — the binary already reached App Store Connect via extport-dev/actions/safari-build.'
+    required: false
+  extension:
+    description: 'Target extension id or slug. Omit if the checked-out repo has an extport.config.json with "extension" set.'
+    required: false
+  version:
+    description: 'Artifact version, 1-4 dot-separated integers (e.g. 1.2.3).'
+    required: true
+  store:
+    description: 'chrome, firefox, edge, or safari. Omit to push a universal zip to every store configured for this extension.'
+    required: false
+  source-zip:
+    description: 'Source code zip for Firefox AMO review. Only valid when store is firefox.'
+    required: false
+  api-key:
+    description: 'extport API key. Pass a repository secret, e.g. secrets.EXTPORT_API_KEY — never inline the raw value.'
+    required: true
+  api-url:
+    description: 'extport platform URL.'
+    required: false
+    default: 'https://dash.extport.dev'
+  cli-version:
+    description: 'Pinned @extport/cli version to run via npx.'
+    required: false
+    default: '0.0.1'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: extport push
+      shell: bash
+      env:
+        EXTPORT_API_KEY: ${{ inputs.api-key }}
+        EXTPORT_API_URL: ${{ inputs.api-url }}
+        EXTPORT_FILE: ${{ inputs.file }}
+        EXTPORT_EXTENSION: ${{ inputs.extension }}
+        EXTPORT_VERSION: ${{ inputs.version }}
+        EXTPORT_STORE: ${{ inputs.store }}
+        EXTPORT_SOURCE_ZIP: ${{ inputs.source-zip }}
+        EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
+      run: |
+        set -euo pipefail
+        args=(push --version "$EXTPORT_VERSION")
+        [ -n "$EXTPORT_FILE" ] && args+=("$EXTPORT_FILE")
+        [ -n "$EXTPORT_EXTENSION" ] && args+=(--extension "$EXTPORT_EXTENSION")
+        [ -n "$EXTPORT_STORE" ] && args+=(--store "$EXTPORT_STORE")
+        [ -n "$EXTPORT_SOURCE_ZIP" ] && args+=(--source-zip "$EXTPORT_SOURCE_ZIP")
+        npx --yes "@extport/cli@${EXTPORT_CLI_VERSION}" "${args[@]}"
