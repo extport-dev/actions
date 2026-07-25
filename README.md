@@ -7,25 +7,33 @@ GitHub Actions for publishing browser extensions with [extport](https://dash.ext
 Uploads an artifact (or, for Safari, just registers a version already delivered to App Store Connect).
 
 ```yaml
+# Explicit:
 - uses: extport-dev/actions/push@v1
   with:
     file: dist.zip
     extension: my-extension
     version: 1.2.3
-    store: chrome # chrome | firefox | edge | safari — omit to push every configured store
+    store: chrome # chrome | firefox | edge | safari
+    api-key: ${{ secrets.EXTPORT_API_KEY }}
+
+# In a WXT project, this pushes every enabled store configured for the
+# extension, inferring each store's zip from .output/ and its version from
+# the zip's own manifest.json (package.json for safari, which has no zip):
+- uses: extport-dev/actions/push@v1
+  with:
     api-key: ${{ secrets.EXTPORT_API_KEY }}
 ```
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `file` | only when `store` isn't `safari` | Path to the zip to upload |
+| `file` | no | Path to the zip to upload. In a WXT project, omit to infer `.output/{name}-{version}-{store}.zip` (always omit for `store: safari`) |
 | `extension` | no | Falls back to the repo's `extport.config.json` |
-| `version` | yes | 1-4 dot-separated integers |
-| `store` | no | `chrome`, `firefox`, `edge`, or `safari` |
+| `version` | no | 1-4 dot-separated integers. Omit to infer it from the zip's manifest.json, or package.json for `store: safari` |
+| `store` | no | `chrome`, `firefox`, `edge`, or `safari`. With `file` set, omit for one universal zip to every configured store. With both `file` and `store` omitted, pushes every enabled store individually |
 | `source-zip` | no | Source zip for Firefox AMO review (`store: firefox` only) |
 | `api-key` | yes | Pass `secrets.EXTPORT_API_KEY` |
 | `api-url` | no | Defaults to `https://dash.extport.dev` |
-| `cli-version` | no | Pinned `@extport/cli` version this action tag was tested against |
+| `cli-version` | no | Pinned `@extport/cli` version this action tag currently runs |
 
 ## `safari-build`
 
@@ -45,14 +53,14 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
 | --- | --- | --- |
 | `project-path` | yes | Directory containing the `.xcodeproj` |
 | `team-id` | yes | Apple Developer Team ID |
-| `issuer-id` | no | App Store Connect API issuer id |
-| `key-id` | no | App Store Connect API key id |
+| `issuer-id` | no | App Store Connect API issuer id. Omit to fall back to the checked-out repo's `extport.config.json` |
+| `key-id` | no | App Store Connect API key id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-base64` | no | Base64-encoded `.p8` key contents — never commit the raw file |
 | `platform` | no | `macos` or `ios` — omit to build every platform the project ships |
 | `version` | no | Fails loudly if the built app's version doesn't match |
 | `macos-deployment-target` | no | Defaults to `12.0` |
-| `cli-version` | no | Pinned `@extport/cli` version this action tag was tested against |
+| `cli-version` | no | Pinned `@extport/cli` version this action tag currently runs |
 
 ## Versioning
 
-Each action tag (`v1`, `v1.1`, …) pins a specific `@extport/cli` version internally (the `cli-version` default). Bumping the CLI version and cutting a new action tag happen together, so a given action version's behavior never changes silently underneath you.
+`v1` moves forward in place to track fixes and the latest compatible `@extport/cli` (the `cli-version` default) — the usual convention for a major-version action tag (same as `actions/checkout@v4`). Pin `cli-version` yourself if you need a specific `@extport/cli` release regardless of what `v1` currently defaults to.
