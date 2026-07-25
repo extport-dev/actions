@@ -53,15 +53,24 @@ runs:
       env:
         EXTPORT_PROJECT_PATH: ${{ inputs.project-path }}
         EXTPORT_TEAM_ID: ${{ inputs.team-id }}
-        ASC_ISSUER_ID: ${{ inputs.issuer-id }}
-        ASC_KEY_ID: ${{ inputs.key-id }}
+        EXTPORT_ISSUER_ID: ${{ inputs.issuer-id }}
+        EXTPORT_KEY_ID: ${{ inputs.key-id }}
         EXTPORT_PLATFORM: ${{ inputs.platform }}
         EXTPORT_VERSION: ${{ inputs.version }}
         EXTPORT_MACOS_DEPLOYMENT_TARGET: ${{ inputs.macos-deployment-target }}
         EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
       run: |
         set -euo pipefail
+        # issuer-id/key-id are passed as flags, not ASC_ISSUER_ID/ASC_KEY_ID env
+        # vars — a left-empty input would still set those to '' (GitHub
+        # Actions' default for an unset optional input), which short-circuits
+        # extport safari-build's own `env.ASC_ISSUER_ID ?? extport.config.json`
+        # fallback (?? only skips null/undefined, not ''). Omitting the flag
+        # entirely lets the CLI fall through to the committed config — and
+        # still fail loudly if neither source has it.
         args=(safari-build --project-path "$EXTPORT_PROJECT_PATH" --team-id "$EXTPORT_TEAM_ID" --macos-deployment-target "$EXTPORT_MACOS_DEPLOYMENT_TARGET")
+        [ -n "$EXTPORT_ISSUER_ID" ] && args+=(--issuer-id "$EXTPORT_ISSUER_ID")
+        [ -n "$EXTPORT_KEY_ID" ] && args+=(--key-id "$EXTPORT_KEY_ID")
         [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
         npx --yes "@extport/cli@${EXTPORT_CLI_VERSION}" "${args[@]}"
