@@ -40,6 +40,7 @@ Uploads an artifact (or, for Safari, just registers a version already delivered 
 Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macOS runner (`runs-on: macos-latest`). Doesn't submit for review, and doesn't register the version with extport — follow it with `push` (`store: safari`, no `file`) for that.
 
 ```yaml
+# Explicit:
 - uses: extport-dev/actions/safari-build@v1
   with:
     project-path: ./ios
@@ -47,12 +48,18 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
     issuer-id: ${{ secrets.APPLE_API_ISSUER }}
     key-id: ${{ secrets.APPLE_API_KEY_ID }}
     key-base64: ${{ secrets.APPLE_API_KEY }} # base64-encoded .p8 contents
+
+# With a committed extport.config.json (e.g. from @extport/wxt or `extport init`),
+# only the actual secret — the .p8 key — needs to be passed:
+- uses: extport-dev/actions/safari-build@v1
+  with:
+    key-base64: ${{ secrets.APPLE_API_KEY }}
 ```
 
 | Input | Required | Description |
 | --- | --- | --- |
-| `project-path` | yes | Directory containing the `.xcodeproj` |
-| `team-id` | yes | Apple Developer Team ID |
+| `project-path` | no | Directory containing the `.xcodeproj`. Omit to fall back to the checked-out repo's `extport.config.json` |
+| `team-id` | no | Apple Developer Team ID. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `issuer-id` | no | App Store Connect API issuer id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-id` | no | App Store Connect API key id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-base64` | no | Base64-encoded `.p8` key contents — never commit the raw file |

@@ -4,11 +4,11 @@ author: 'extport'
 
 inputs:
   project-path:
-    description: 'Directory containing the .xcodeproj.'
-    required: true
+    description: 'Directory containing the .xcodeproj. Omit to fall back to the checked-out repo''s extport.config.json.'
+    required: false
   team-id:
-    description: 'Apple Developer Team ID.'
-    required: true
+    description: 'Apple Developer Team ID. Omit to fall back to the checked-out repo''s extport.config.json.'
+    required: false
   issuer-id:
     description: 'App Store Connect API issuer id.'
     required: false
@@ -67,8 +67,12 @@ runs:
         # extport safari-build's own `env.ASC_ISSUER_ID ?? extport.config.json`
         # fallback (?? only skips null/undefined, not ''). Omitting the flag
         # entirely lets the CLI fall through to the committed config — and
-        # still fail loudly if neither source has it.
-        args=(safari-build --project-path "$EXTPORT_PROJECT_PATH" --team-id "$EXTPORT_TEAM_ID" --macos-deployment-target "$EXTPORT_MACOS_DEPLOYMENT_TARGET")
+        # still fail loudly if neither source has it. project-path/team-id
+        # have no env var equivalent to worry about, but get the same
+        # omit-when-empty treatment so they fall back the same way.
+        args=(safari-build --macos-deployment-target "$EXTPORT_MACOS_DEPLOYMENT_TARGET")
+        [ -n "$EXTPORT_PROJECT_PATH" ] && args+=(--project-path "$EXTPORT_PROJECT_PATH")
+        [ -n "$EXTPORT_TEAM_ID" ] && args+=(--team-id "$EXTPORT_TEAM_ID")
         [ -n "$EXTPORT_ISSUER_ID" ] && args+=(--issuer-id "$EXTPORT_ISSUER_ID")
         [ -n "$EXTPORT_KEY_ID" ] && args+=(--key-id "$EXTPORT_KEY_ID")
         [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
