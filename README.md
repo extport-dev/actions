@@ -2,6 +2,16 @@
 
 GitHub Actions for publishing browser extensions with [extport](https://dash.extport.dev). Both actions are thin wrappers around [`@extport/cli`](https://www.npmjs.com/package/@extport/cli) run via `npx` — all the real logic lives in the CLI.
 
+In a monorepo where the WXT project isn't at the repo root, set `working-directory` on the action itself — GitHub's own `working-directory:` step property has no effect on a `uses:` step, only `run:` steps, so it can't be set on the line that calls these actions.
+
+```yaml
+- uses: extport-dev/actions/push@v1
+  with:
+    working-directory: packages/my-extension
+    store: chrome
+    api-key: ${{ secrets.EXTPORT_API_KEY }}
+```
+
 ## `push`
 
 Uploads an artifact (or, for Safari, just registers a version already delivered to App Store Connect).
@@ -34,6 +44,7 @@ Uploads an artifact (or, for Safari, just registers a version already delivered 
 | `api-key` | yes | Pass `secrets.EXTPORT_API_KEY` |
 | `api-url` | no | Defaults to `https://dash.extport.dev` |
 | `cli-version` | no | Pinned `@extport/cli` version this action tag currently runs |
+| `working-directory` | no | Defaults to `.` — set for a monorepo where the WXT project isn't at the repo root |
 
 ## `safari-build`
 
@@ -67,6 +78,7 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
 | `version` | no | Fails loudly if the built app's version doesn't match |
 | `macos-deployment-target` | no | Defaults to `12.0` |
 | `cli-version` | no | Pinned `@extport/cli` version this action tag currently runs |
+| `working-directory` | no | Defaults to `.` — set for a monorepo where the WXT project isn't at the repo root |
 
 ## Versioning
 

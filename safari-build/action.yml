@@ -32,6 +32,10 @@ inputs:
     description: 'Pinned @extport/cli version to run via npx.'
     required: false
     default: '0.0.3'
+  working-directory:
+    description: 'Directory to run in — set this in a monorepo where the WXT project (and its extport.config.json) isn''t at the repo root. GitHub Actions'' own working-directory step property has no effect on a `uses:` step like this one, which is why this exists as its own input.'
+    required: false
+    default: '.'
 
 runs:
   using: 'composite'
@@ -50,6 +54,7 @@ runs:
 
     - name: extport safari-build
       shell: bash
+      working-directory: ${{ inputs.working-directory }}
       env:
         EXTPORT_PROJECT_PATH: ${{ inputs.project-path }}
         EXTPORT_TEAM_ID: ${{ inputs.team-id }}
