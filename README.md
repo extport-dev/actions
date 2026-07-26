@@ -1,6 +1,6 @@
 # extport-dev/actions
 
-GitHub Actions for publishing browser extensions with [extport](https://dash.extport.dev). Both actions are thin wrappers around [`@extport/cli`](https://www.npmjs.com/package/@extport/cli) run via `npx` — all the real logic lives in the CLI.
+GitHub Actions for publishing browser extensions with [extport](https://dash.extport.dev). Both actions are thin wrappers around [`@extport/cli`](https://www.npmjs.com/package/@extport/cli) installed globally at run time — all the real logic lives in the CLI.
 
 In a monorepo where the WXT project isn't at the repo root, set `working-directory` on the action itself — GitHub's own `working-directory:` step property has no effect on a `uses:` step, only `run:` steps, so it can't be set on the line that calls these actions.
 

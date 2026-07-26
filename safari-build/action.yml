@@ -29,7 +29,7 @@ inputs:
     required: false
     default: '12.0'
   cli-version:
-    description: 'Pinned @extport/cli version to run via npx.'
+    description: 'Pinned @extport/cli version to install and run.'
     required: false
     default: '0.0.3'
   working-directory:
@@ -66,6 +66,12 @@ runs:
         EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
       run: |
         set -euo pipefail
+        # npx --yes <pkg>@<version> <args> occasionally swallows a failed
+        # fetch/install silently instead of erroring, then falls through to
+        # "run" anyway and fails with a bare "command not found" — no visible
+        # npm error. Installing explicitly surfaces a real failure if the
+        # package genuinely can't be fetched, instead of a confusing one.
+        npm install --global "@extport/cli@${EXTPORT_CLI_VERSION}"
         # issuer-id/key-id are passed as flags, not ASC_ISSUER_ID/ASC_KEY_ID env
         # vars — a left-empty input would still set those to '' (GitHub
         # Actions' default for an unset optional input), which short-circuits
@@ -82,7 +88,7 @@ runs:
         [ -n "$EXTPORT_KEY_ID" ] && args+=(--key-id "$EXTPORT_KEY_ID")
         [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
-        npx --yes "@extport/cli@${EXTPORT_CLI_VERSION}" "${args[@]}"
+        extport "${args[@]}"
 
     - name: Clean up the temp key file
       if: always() && inputs.key-base64 != ''

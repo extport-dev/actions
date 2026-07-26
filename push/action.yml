@@ -26,7 +26,7 @@ inputs:
     required: false
     default: 'https://dash.extport.dev'
   cli-version:
-    description: 'Pinned @extport/cli version to run via npx.'
+    description: 'Pinned @extport/cli version to install and run.'
     required: false
     default: '0.0.3'
   working-directory:
@@ -51,10 +51,16 @@ runs:
         EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
       run: |
         set -euo pipefail
+        # npx --yes <pkg>@<version> <args> occasionally swallows a failed
+        # fetch/install silently instead of erroring, then falls through to
+        # "run" anyway and fails with a bare "command not found" — no visible
+        # npm error. Installing explicitly surfaces a real failure if the
+        # package genuinely can't be fetched, instead of a confusing one.
+        npm install --global "@extport/cli@${EXTPORT_CLI_VERSION}"
         args=(push)
         [ -n "$EXTPORT_FILE" ] && args+=("$EXTPORT_FILE")
         [ -n "$EXTPORT_EXTENSION" ] && args+=(--extension "$EXTPORT_EXTENSION")
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
         [ -n "$EXTPORT_STORE" ] && args+=(--store "$EXTPORT_STORE")
         [ -n "$EXTPORT_SOURCE_ZIP" ] && args+=(--source-zip "$EXTPORT_SOURCE_ZIP")
-        npx --yes "@extport/cli@${EXTPORT_CLI_VERSION}" "${args[@]}"
+        extport "${args[@]}"
