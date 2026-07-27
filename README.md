@@ -59,12 +59,16 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
     issuer-id: ${{ secrets.APPLE_API_ISSUER }}
     key-id: ${{ secrets.APPLE_API_KEY_ID }}
     key-base64: ${{ secrets.APPLE_API_KEY }} # base64-encoded .p8 contents
+    certificate-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }} # base64-encoded .p12 contents
+    certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 
 # With a committed extport.config.json (e.g. from @extport/wxt or `extport init`),
-# only the actual secret — the .p8 key — needs to be passed:
+# only the actual secrets need to be passed:
 - uses: extport-dev/actions/safari-build@v1
   with:
     key-base64: ${{ secrets.APPLE_API_KEY }}
+    certificate-base64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+    certificate-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
 ```
 
 | Input | Required | Description |
@@ -74,11 +78,34 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
 | `issuer-id` | no | App Store Connect API issuer id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-id` | no | App Store Connect API key id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-base64` | no | Base64-encoded `.p8` key contents — never commit the raw file |
+| `certificate-base64` | no | Base64-encoded `.p12` signing certificate contents. Strongly recommended — see "Signing certificate" below |
+| `certificate-password` | no | Password the `.p12` was exported with. Required if `certificate-base64` is set |
 | `platform` | no | `macos` or `ios` — omit to build every platform the project ships |
 | `version` | no | Fails loudly if the built app's version doesn't match |
 | `macos-deployment-target` | no | Defaults to `12.0` |
 | `cli-version` | no | Pinned `@extport/cli` version this action tag currently runs |
 | `working-directory` | no | Defaults to `.` — set for a monorepo where the WXT project isn't at the repo root |
+
+### Signing certificate
+
+Without `certificate-base64`, cloud signing (`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`) resolves a
+signing identity from the runner's *local* keychain — which starts empty on every GitHub-hosted macOS runner. Finding
+nothing, it asks Apple to mint a brand new certificate each run. That certificate's private key is destroyed with the
+runner at the end of the job, so it's permanently unusable from that point on: every run without this input burns one
+certificate for good, silently, until your account hits Apple's cap on how many of that type it'll let you have —
+confirmed against a real account that hit exactly this wall after a few days of otherwise-unremarkable CI runs
+("Your account has reached the maximum number of certificates").
+
+Generate one certificate yourself, export it as a `.p12` (Keychain Access → your certificate → Export, or
+`security export`), base64-encode it, and store both the file and its export password as repo secrets:
+
+```sh
+base64 -i Certificates.p12 | pbcopy
+```
+
+Pass it via `certificate-base64`/`certificate-password` and every run reuses that same certificate instead of minting
+a new one — it's tied to your Apple Developer account, not to any one app, so the same `.p12` works for every project
+you build with this action.
 
 ## Versioning
 

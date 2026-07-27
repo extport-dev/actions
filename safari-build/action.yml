@@ -18,6 +18,12 @@ inputs:
   key-base64:
     description: 'Base64-encoded contents of the App Store Connect .p8 API key. Pass a repository secret — never commit the raw file.'
     required: false
+  certificate-base64:
+    description: 'Base64-encoded contents of a signing certificate .p12 file. Strongly recommended on CI — see "Signing certificate" below for why. Pass a repository secret.'
+    required: false
+  certificate-password:
+    description: 'Password the .p12 in certificate-base64 was exported with. Required if certificate-base64 is set.'
+    required: false
   platform:
     description: 'Build only "macos" or only "ios". Omit to build every platform the Xcode project ships.'
     required: false
@@ -51,6 +57,54 @@ runs:
         echo "$EXTPORT_KEY_BASE64" | base64 --decode > "$key_path"
         chmod 600 "$key_path"
         echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+
+    # A GitHub-hosted macOS runner starts with an empty keychain every run.
+    # Cloud signing (CODE_SIGN_STYLE=Automatic + -allowProvisioningUpdates,
+    # what `extport safari-build` uses) resolves a signing identity from the
+    # *local keychain*, not from the certificates already sitting in your
+    # Apple account — if it can't find one locally it asks Apple to mint a
+    # brand new one. On an ephemeral runner that new certificate's private
+    # key is destroyed with the runner at the end of the job, so it's
+    # permanently unusable garbage from that point on: every run without this
+    # step burns one certificate for good. Apple caps how many of a given
+    # type an account may have, so this eventually fails outright with
+    # "Your account has reached the maximum number of certificates" —
+    # confirmed against a real account that had silently hit the cap this
+    # way. Importing one certificate you generated and saved yourself, and
+    # reusing it every run, avoids minting new ones at all.
+    - name: Import the signing certificate into a temporary keychain
+      if: inputs.certificate-base64 != ''
+      shell: bash
+      env:
+        EXTPORT_CERTIFICATE_BASE64: ${{ inputs.certificate-base64 }}
+        EXTPORT_CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
+      run: |
+        set -euo pipefail
+        if [ -z "$EXTPORT_CERTIFICATE_PASSWORD" ]; then
+          echo "::error::certificate-password is required when certificate-base64 is set" >&2
+          exit 1
+        fi
+
+        cert_path="$RUNNER_TEMP/extport-cert.p12"
+        keychain_path="$RUNNER_TEMP/extport-signing.keychain-db"
+        keychain_password="$(uuidgen)"
+        echo "$EXTPORT_CERTIFICATE_BASE64" | base64 --decode > "$cert_path"
+
+        security create-keychain -p "$keychain_password" "$keychain_path"
+        security set-keychain-settings "$keychain_path"
+        security unlock-keychain -p "$keychain_password" "$keychain_path"
+
+        # Prepend rather than replace — keep whatever's already on the
+        # default search list resolvable too.
+        readarray -t existing_keychains < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
+        security list-keychains -d user -s "$keychain_path" "${existing_keychains[@]}"
+
+        security import "$cert_path" -k "$keychain_path" -P "$EXTPORT_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
+        security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain_path"
+        security default-keychain -s "$keychain_path"
+
+        rm -f "$cert_path"
+        echo "EXTPORT_KEYCHAIN_PATH=$keychain_path" >> "$GITHUB_ENV"
 
     - name: extport safari-build
       shell: bash
@@ -94,3 +148,10 @@ runs:
       if: always() && inputs.key-base64 != ''
       shell: bash
       run: rm -f "$RUNNER_TEMP/extport-asc-key.p8"
+
+    - name: Delete the temporary signing keychain
+      if: always() && inputs.certificate-base64 != ''
+      shell: bash
+      run: |
+        keychain_path="$RUNNER_TEMP/extport-signing.keychain-db"
+        [ -f "$keychain_path" ] && security delete-keychain "$keychain_path" || true
