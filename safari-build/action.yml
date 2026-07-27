@@ -95,8 +95,15 @@ runs:
         security unlock-keychain -p "$keychain_password" "$keychain_path"
 
         # Prepend rather than replace — keep whatever's already on the
-        # default search list resolvable too.
-        readarray -t existing_keychains < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
+        # default search list resolvable too. `readarray`/`mapfile` isn't an
+        # option: macOS's /bin/bash is stuck on 3.2 (last GPLv2 release,
+        # Apple never shipped 4.0+), which predates both — confirmed the hard
+        # way, this exact line failed with "readarray: command not found" on
+        # a real runner.
+        existing_keychains=()
+        while IFS= read -r line; do
+          existing_keychains+=("$line")
+        done < <(security list-keychains -d user | sed -e 's/^[[:space:]]*"//' -e 's/"[[:space:]]*$//')
         security list-keychains -d user -s "$keychain_path" "${existing_keychains[@]}"
 
         security import "$cert_path" -k "$keychain_path" -P "$EXTPORT_CERTIFICATE_PASSWORD" -T /usr/bin/codesign -T /usr/bin/security
