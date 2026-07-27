@@ -34,6 +34,10 @@ inputs:
     description: 'Minimum macOS version to build for.'
     required: false
     default: '12.0'
+  debug:
+    description: 'Stream xcodebuild''s full raw output live instead of only dumping it on failure. Off by default because it''s verbose — turn on when a run looks stuck and you need to see what xcodebuild is actually doing.'
+    required: false
+    default: 'false'
   cli-version:
     description: 'Pinned @extport/cli version to install and run.'
     required: false
@@ -124,6 +128,7 @@ runs:
         EXTPORT_PLATFORM: ${{ inputs.platform }}
         EXTPORT_VERSION: ${{ inputs.version }}
         EXTPORT_MACOS_DEPLOYMENT_TARGET: ${{ inputs.macos-deployment-target }}
+        EXTPORT_DEBUG: ${{ inputs.debug }}
         EXTPORT_CLI_VERSION: ${{ inputs.cli-version }}
       run: |
         set -euo pipefail
@@ -149,6 +154,7 @@ runs:
         [ -n "$EXTPORT_KEY_ID" ] && args+=(--key-id "$EXTPORT_KEY_ID")
         [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
+        [ "$EXTPORT_DEBUG" = "true" ] && args+=(--debug)
         extport "${args[@]}"
 
     - name: Clean up the temp key file
