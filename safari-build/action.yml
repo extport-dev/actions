@@ -177,7 +177,30 @@ runs:
         [ -n "$EXTPORT_PLATFORM" ] && args+=(--platform "$EXTPORT_PLATFORM")
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
         [ "$EXTPORT_DEBUG" = "true" ] && args+=(--debug)
-        extport "${args[@]}"
+
+        # Tee into a file so the run stays live in the log (same as today)
+        # while also letting us pull out just the CLI's own progress/result
+        # lines afterward — `── platform: step ──` and `✅`/`❌` are the
+        # only lines extport itself prints (see safari-build.ts's log()
+        # calls); everything else on stdout is raw xcodebuild noise, which
+        # this deliberately leaves out of the summary. `|| status=$?` (not a
+        # bare `set -e` failure) is what lets the summary still get written
+        # on a failed build instead of the script exiting before reaching it.
+        output_file="$RUNNER_TEMP/extport-safari-build-output.log"
+        status=0
+        extport "${args[@]}" 2>&1 | tee "$output_file" || status=$?
+
+        {
+          echo '### Safari build'
+          echo
+          if grep -qE '^(✅|❌|──)' "$output_file"; then
+            grep -E '^(✅|❌|──)' "$output_file" | sed 's/^/- /'
+          else
+            echo '_No progress markers captured — see the full step log._'
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        exit "$status"
 
     - name: Clean up the temp key file
       if: always() && inputs.key-base64 != ''

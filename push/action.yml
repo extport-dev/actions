@@ -63,4 +63,23 @@ runs:
         [ -n "$EXTPORT_VERSION" ] && args+=(--version "$EXTPORT_VERSION")
         [ -n "$EXTPORT_STORE" ] && args+=(--store "$EXTPORT_STORE")
         [ -n "$EXTPORT_SOURCE_ZIP" ] && args+=(--source-zip "$EXTPORT_SOURCE_ZIP")
-        extport "${args[@]}"
+
+        # push's own output is always a handful of lines (unlike
+        # safari-build, there's no noisy underlying tool to filter out), so
+        # the whole thing goes into the summary as-is — no need to be
+        # selective about it. `|| status=$?` (not a bare `set -e` failure)
+        # is what lets the summary still get written on a failed push
+        # instead of the script exiting before reaching it.
+        output_file="$RUNNER_TEMP/extport-push-output.log"
+        status=0
+        extport "${args[@]}" 2>&1 | tee "$output_file" || status=$?
+
+        {
+          echo '### extport push'
+          echo
+          echo '```'
+          cat "$output_file"
+          echo '```'
+        } >> "$GITHUB_STEP_SUMMARY"
+
+        exit "$status"
