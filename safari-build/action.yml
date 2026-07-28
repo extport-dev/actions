@@ -19,11 +19,11 @@ inputs:
     description: 'Base64-encoded contents of the App Store Connect .p8 API key. Pass a repository secret — never commit the raw file.'
     required: false
   certificate-base64:
-    description: 'Base64-encoded contents of a signing certificate .p12 file. Strongly recommended on CI — see "Signing certificate" below for why. Pass a repository secret.'
-    required: false
+    description: 'Base64-encoded contents of a signing certificate .p12 file. Required — see "Signing certificate" below for why. Pass a repository secret.'
+    required: true
   certificate-password:
-    description: 'Password the .p12 in certificate-base64 was exported with. Required if certificate-base64 is set.'
-    required: false
+    description: 'Password the .p12 in certificate-base64 was exported with. Required.'
+    required: true
   platform:
     description: 'Build only "macos" or only "ios". Omit to build every platform the Xcode project ships.'
     required: false
@@ -50,6 +50,25 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # `required: true` above is a documentation hint only — composite actions
+    # don't get automatic required-input enforcement from the runner (a
+    # long-standing GitHub Actions gap), so it does NOT actually fail the job
+    # if these are omitted. This step is the real enforcement, on purpose:
+    # see "Import the signing certificate" below for why silently proceeding
+    # without one is exactly the failure mode this whole thing exists to
+    # prevent.
+    - name: Require a signing certificate
+      shell: bash
+      env:
+        EXTPORT_CERTIFICATE_BASE64: ${{ inputs.certificate-base64 }}
+        EXTPORT_CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
+      run: |
+        set -euo pipefail
+        if [ -z "$EXTPORT_CERTIFICATE_BASE64" ] || [ -z "$EXTPORT_CERTIFICATE_PASSWORD" ]; then
+          echo "::error::certificate-base64 and certificate-password are both required — see https://github.com/extport-dev/actions#signing-certificate for how to generate one. Omitting them used to silently fall back to minting a new Apple certificate every run, which permanently burns one each time and eventually hits Apple's account-wide cap; that fallback no longer exists." >&2
+          exit 1
+        fi
+
     - name: Write the .p8 key to a temp file
       if: inputs.key-base64 != ''
       shell: bash
@@ -77,18 +96,12 @@ runs:
     # way. Importing one certificate you generated and saved yourself, and
     # reusing it every run, avoids minting new ones at all.
     - name: Import the signing certificate into a temporary keychain
-      if: inputs.certificate-base64 != ''
       shell: bash
       env:
         EXTPORT_CERTIFICATE_BASE64: ${{ inputs.certificate-base64 }}
         EXTPORT_CERTIFICATE_PASSWORD: ${{ inputs.certificate-password }}
       run: |
         set -euo pipefail
-        if [ -z "$EXTPORT_CERTIFICATE_PASSWORD" ]; then
-          echo "::error::certificate-password is required when certificate-base64 is set" >&2
-          exit 1
-        fi
-
         cert_path="$RUNNER_TEMP/extport-cert.p12"
         keychain_path="$RUNNER_TEMP/extport-signing.keychain-db"
         keychain_password="$(uuidgen)"
@@ -172,7 +185,7 @@ runs:
       run: rm -f "$RUNNER_TEMP/extport-asc-key.p8"
 
     - name: Delete the temporary signing keychain
-      if: always() && inputs.certificate-base64 != ''
+      if: always()
       shell: bash
       run: |
         keychain_path="$RUNNER_TEMP/extport-signing.keychain-db"

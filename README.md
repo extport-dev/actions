@@ -78,8 +78,8 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
 | `issuer-id` | no | App Store Connect API issuer id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-id` | no | App Store Connect API key id. Omit to fall back to the checked-out repo's `extport.config.json` |
 | `key-base64` | no | Base64-encoded `.p8` key contents — never commit the raw file |
-| `certificate-base64` | no | Base64-encoded `.p12` signing certificate contents. Strongly recommended — see "Signing certificate" below |
-| `certificate-password` | no | Password the `.p12` was exported with. Required if `certificate-base64` is set |
+| `certificate-base64` | **yes** | Base64-encoded `.p12` signing certificate contents — see "Signing certificate" below |
+| `certificate-password` | **yes** | Password the `.p12` was exported with |
 | `platform` | no | `macos` or `ios` — omit to build every platform the project ships |
 | `version` | no | Fails loudly if the built app's version doesn't match |
 | `macos-deployment-target` | no | Defaults to `12.0` |
@@ -88,13 +88,16 @@ Builds, signs, and uploads a Safari extension to App Store Connect. Needs a macO
 
 ### Signing certificate
 
-Without `certificate-base64`, cloud signing (`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`) resolves a
-signing identity from the runner's *local* keychain — which starts empty on every GitHub-hosted macOS runner. Finding
-nothing, it asks Apple to mint a brand new certificate each run. That certificate's private key is destroyed with the
-runner at the end of the job, so it's permanently unusable from that point on: every run without this input burns one
+`certificate-base64`/`certificate-password` are required, on purpose, with no silent fallback. Cloud signing
+(`CODE_SIGN_STYLE=Automatic` + `-allowProvisioningUpdates`) resolves a signing identity from the runner's *local*
+keychain — which starts empty on every GitHub-hosted macOS runner. Without a certificate already sitting there, it
+asks Apple to mint a brand new certificate each run. That certificate's private key is destroyed with the runner at
+the end of the job, so it's permanently unusable from that point on: every run without this input burns one
 certificate for good, silently, until your account hits Apple's cap on how many of that type it'll let you have —
 confirmed against a real account that hit exactly this wall after a few days of otherwise-unremarkable CI runs
-("Your account has reached the maximum number of certificates").
+("Your account has reached the maximum number of certificates"). This used to be an optional input with that
+fallback; it isn't anymore — omitting it now fails the run immediately with a clear error instead of degrading into
+the same silent failure mode again.
 
 Generate one certificate yourself, export it as a `.p12` (Keychain Access → your certificate → Export, or
 `security export`), base64-encode it, and store both the file and its export password as repo secrets:
