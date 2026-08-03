@@ -41,7 +41,7 @@ inputs:
   cli-version:
     description: 'Pinned @extport/cli version to install and run.'
     required: false
-    default: '0.0.5'
+    default: '0.0.8'
   working-directory:
     description: 'Directory to run in — set this in a monorepo where the WXT project (and its extport.config.json) isn''t at the repo root. GitHub Actions'' own working-directory step property has no effect on a `uses:` step like this one, which is why this exists as its own input.'
     required: false

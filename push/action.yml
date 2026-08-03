@@ -16,7 +16,7 @@ inputs:
     description: 'chrome, firefox, edge, or safari. With file set, omit to push one universal zip to every configured store. With both file and store omitted, pushes every enabled store individually, each inferred from the WXT project.'
     required: false
   source-zip:
-    description: 'Source code zip for Firefox AMO review. Only valid when store is firefox.'
+    description: 'Source code zip for Firefox AMO review. Only valid when store is firefox. In a WXT project, omit to infer .output/{name}-{version}-sources.zip when it exists.'
     required: false
   api-key:
     description: 'extport API key. Pass a repository secret, e.g. secrets.EXTPORT_API_KEY — never inline the raw value.'
@@ -28,7 +28,7 @@ inputs:
   cli-version:
     description: 'Pinned @extport/cli version to install and run.'
     required: false
-    default: '0.0.5'
+    default: '0.0.8'
   working-directory:
     description: 'Directory to run in — set this in a monorepo where the WXT project (and its extport.config.json) isn''t at the repo root. GitHub Actions'' own working-directory step property has no effect on a `uses:` step like this one, which is why this exists as its own input.'
     required: false
